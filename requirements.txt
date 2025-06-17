@@ -1,0 +1,10 @@
+streamlit
+agno
+groq
+psycopg2-binary
+python-dotenv
+dotenv
+PyPDF2
+pandas
+yfinance
+sqlalchemy
