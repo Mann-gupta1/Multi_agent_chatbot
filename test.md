@@ -1,235 +1,213 @@
-## Test Cases
+# Stock Market Chatbot Test Cases
 
-### 1. Stock Market Queries
-These test the `KnowledgeAgent`'s ability to retrieve open prices from `stock_market_data.csv`, handle missing years, use last mentioned dates, and fall back to `YFinanceTools`.
+This document outlines test cases to verify the functionality of the stock market chatbot, focusing on stock prices, historical data, predictions, and memory queries. The chatbot uses a JSON-RPC server (`mcp_server.py`) for stock market tools, integrated with a multi-agent system (`coordinator_team.py`, `knowledge_agent.py`, etc.). Tests are designed to ensure correct agent routing, context inference, and data retrieval from `yfinance` or `stock_market_data.csv`.
 
-#### 1.1 Explicit Date with Year
-**Question**: "What is the market open price on 4th June 2025"  
+**Setup Instructions**:
+1. Ensure `stock_market_data.csv` is in `app/data/` with columns: `Date`, `Open`, `Close`, and optionally `Symbol`.
+2. Start the JSON-RPC server:
+   ```bash
+   cd C:\Users\manng\OneDrive\Desktop\EI\chatbot\app\agents
+   python mcp_server.py
+   ```
+3. Start PostgreSQL:
+   ```bash
+   cd C:\Users\manng\OneDrive\Desktop\EI\chatbot
+   docker-compose up -d
+   ```
+4. Run the Streamlit app:
+   ```bash
+   streamlit run app\main.py
+   ```
+5. Access `http://localhost:8501` and input queries via the UI.
+6. Clear chat history before starting tests to ensure clean context.
+
+**Notes**:
+- Expected outputs use sample data from `yfinance` (as of June 18, 2025) or `stock_market_data.csv`. Actual prices may vary; verify the format and agent.
+- Predictions use linear regression, so exact values depend on historical data but should follow the format.
+- All tests assume a virtual environment with dependencies from `requirements.txt`.
+
+---
+
+## Test Case 1: Current Stock Price
+**Purpose**: Verify `GeneralAgent` fetches the latest stock price via JSON-RPC (`fetch_stock_price`).
+**Input**: "What is the stock price of NVIDIA"
 **Expected Output**:
 ```
-The market open price on June 4, 2025 was 18.65.
+The latest closing price of NVDA is $135.87
 
-Response by KnowledgeAgent
+Response by GeneralAgent
 ```
+**Verification**:
+- Check that the response uses the correct symbol (NVDA).
+- Confirm the price is recent (within 1 day, per `yfinance`).
+- Ensure `GeneralAgent` responds, not `KnowledgeAgent`.
 
-#### 1.2 Explicit Date with Year (Alternate Format)
-**Question**: "What is the market open price 4/10/2025"  
+---
+
+## Test Case 2: Historical Stock Price with Date
+**Purpose**: Verify `GeneralAgent` fetches a historical stock price for a specific date via JSON-RPC (`fetch_stock_price`).
+**Input**: "Stock price of Tesla on 6/10/2025"
 **Expected Output**:
 ```
-The market open price on April 10, 2025 was 18.08.
+The closing price of TSLA on 06/10/2025 was $260.45
 
-Response by KnowledgeAgent
+Response by GeneralAgent
 ```
+**Verification**:
+- Confirm the date is parsed correctly (MM/DD/YYYY).
+- Verify the price matches `yfinance` data for TSLA on June 10, 2025.
+- Ensure `GeneralAgent` responds.
 
-#### 1.3 Date without Year
-**Question**: "What is the market open price on 4th June"  
+---
+
+## Test Case 3: Historical Data
+**Purpose**: Verify `GeneralAgent` fetches historical stock data via JSON-RPC (`fetch_historical_data`).
+**Input**: "Historical data for Apple"
+**Expected Output**:
+```
+06/01/2025: Open=$190.10, Close=$192.30
+06/02/2025: Open=$192.50, Close=$195.80
+...
+06/17/2025: Open=$200.00, Close=$202.15
+
+Response by GeneralAgent
+```
+**Verification**:
+- Check that data covers the default period (1 month).
+- Confirm dates and prices align with `yfinance` or `stock_market_data.csv` for AAPL.
+- Ensure `GeneralAgent` responds.
+
+---
+
+## Test Case 4: Stock Price Prediction
+**Purpose**: Verify `GeneralAgent` predicts a future stock price via JSON-RPC (`predict_stock_price`).
+**Input**: "Predict price of NVIDIA in 5 days"
+**Expected Output**:
+```
+Predicted closing price for NVDA in 5 days is $140.22
+
+Response by GeneralAgent
+```
+**Verification**:
+- Confirm the prediction uses NVDA and 5 days.
+- Verify the response format (predicted price in USD).
+- Note: Exact price depends on linear regression; check for reasonable value based on recent NVDA trends.
+
+---
+
+## Test Case 5: Context Inference for Stock Symbol
+**Purpose**: Verify context inference infers the stock symbol from chat history.
+**Input Sequence**:
+1. "What is the stock price of NVIDIA"
+2. "Predict price in 3 days"
+**Expected Output**:
+1. ```
+   The latest closing price of NVDA is $135.87
+
+   Response by GeneralAgent
+   ```
+2. ```
+   Predicted closing price for NVDA in 3 days is $138.50
+
+   Response by GeneralAgent
+   ```
+**Verification**:
+- Confirm the second query infers NVDA from the first.
+- Check that both responses use `GeneralAgent`.
+- Verify price and prediction formats.
+
+---
+
+## Test Case 6: CSV-Based Market Open Price
+**Purpose**: Verify `KnowledgeAgent` retrieves market open price from `stock_market_data.csv`.
+**Input**: "What is the market open price on 4th June"
 **Expected Output**:
 ```
 The market open price on June 4, 2025 (assuming 2025) was 18.65.
 
 Response by KnowledgeAgent
 ```
+**Verification**:
+- Confirm the date is parsed as June 4, 2025.
+- Verify the open price matches `stock_market_data.csv`.
+- Ensure `KnowledgeAgent` responds.
 
-#### 1.4 Ambiguous Query (Uses Last Mentioned Date)
-**Precondition**: Previous query was "What is the market open price on 4th June 2025"  
-**Question**: "market open price"  
+---
+
+## Test Case 7: Memory Query
+**Purpose**: Verify `MemoryAgent` retrieves previous queries.
+**Input Sequence**:
+1. "What is the stock price of NVIDIA"
+2. "What did I ask earlier?"
+**Expected Output**:
+1. ```
+   The latest closing price of NVDA is $135.87
+
+   Response by GeneralAgent
+   ```
+2. ```
+   You previously asked:
+   - "What is the stock price of NVIDIA"
+
+   Response by MemoryAgent
+   ```
+**Verification**:
+- Confirm the second query lists the first query.
+- Ensure `MemoryAgent` responds.
+
+---
+
+## Test Case 8: Invalid Stock Symbol
+**Purpose**: Verify error handling for invalid stock symbols.
+**Input**: "What is the stock price of XYZ"
 **Expected Output**:
 ```
-The market open price on June 4, 2025 was 18.65.
-
-Response by KnowledgeAgent
-```
-
-#### 1.5 Invalid Date
-**Question**: "What is the market open price on 30th February 2025"  
-**Expected Output**:
-```
-Please provide a valid date (e.g., '4th June 2025' or '4/10/2025').
-
-Response by KnowledgeAgent
-```
-
-#### 1.6 Date Not in CSV
-**Question**: "What is the market open price on 1st January 2026"  
-**Expected Output**:
-```
-No data available for 01/01/2026 in the CSV file.
-
-Response by KnowledgeAgent
-```
-
-#### 1.7 Non-CSV Stock Query (Uses YFinanceTools)
-**Question**: "What is the latest news about NVIDIA?"  
-**Expected Output**:
-```
-[News about NVIDIA, e.g., recent articles or updates fetched via YFinanceTools]
-
-Response by KnowledgeAgent
-```
-**Note**: Actual output depends on `YFinanceTools` and internet connectivity.
-
-### 2. General Queries
-These test the `GeneralAgent`'s ability to answer general questions, using chat history for context (e.g., inferring India).
-
-#### 2.1 Explicit Country Query
-**Question**: "What is the capital of India"  
-**Expected Output**:
-```
-The capital of India is New Delhi.
+Error fetching price for XYZ: No data for XYZ
 
 Response by GeneralAgent
 ```
+**Verification**:
+- Confirm the error message is clear.
+- Ensure `GeneralAgent` responds.
 
-#### 2.2 Context-Aware Query
-**Precondition**: Previous query was "What is the capital of India"  
-**Question**: "Who is the president"  
+---
+
+## Test Case 9: Non-Stock-Market Query
+**Purpose**: Verify fallback to Groq API for non-stock-market queries.
+**Input**: "Who is the CEO of NVIDIA"
 **Expected Output**:
 ```
-The President of India is Droupadi Murmu.
+The CEO of NVIDIA is Jensen Huang.
 
 Response by GeneralAgent
 ```
+**Verification**:
+- Confirm the response uses the Groq API (not JSON-RPC).
+- Ensure `GeneralAgent` responds.
+- Note: This tests the fallback mechanism, as CEO queries are outside the stock market focus.
 
-#### 2.3 Non-Contextual General Query
-**Question**: "What is the capital of France"  
+---
+
+## Test Case 10: Ambiguous Query Without Context
+**Purpose**: Verify handling of ambiguous queries without chat history context.
+**Input**: "Stock price" (with no prior queries)
 **Expected Output**:
 ```
-The capital of France is Paris.
+Please specify a stock symbol (e.g., NVDA, TSLA).
 
 Response by GeneralAgent
 ```
+**Verification**:
+- Confirm the response prompts for a symbol.
+- Ensure `GeneralAgent` responds.
 
-#### 2.4 President Query without Prior Context
-**Question**: "Who is the president"  
-**Expected Output**:
-```
-The President of India is Droupadi Murmu.
+---
 
-Response by GeneralAgent
-```
-**Note**: Defaults to India if no prior country context.
-
-### 3. PDF Queries
-These test the `RAGAgent`'s ability to process uploaded PDFs.
-
-#### 3.1 Valid PDF Query
-**Precondition**: Upload a PDF containing information about "PDF Solutions Ltd."  
-**Question**: "What does the PDF say about PDF Solutions Ltd?"  
-**Expected Output**:
-```
-[Extracted content from the PDF about PDF Solutions Ltd., e.g., company description or financials]
-
-Response by RAGAgent
-```
-
-#### 3.2 No PDF Uploaded
-**Question**: "What does the PDF say about PDF Solutions Ltd?"  
-**Expected Output**:
-```
-No PDF uploaded. Please upload a PDF file to query its content.
-
-Response by RAGAgent
-```
-
-#### 3.3 Invalid PDF
-**Precondition**: Upload a corrupted or non-readable PDF  
-**Question**: "What does the PDF say?"  
-**Expected Output**:
-```
-Failed to process PDF. Please upload a valid PDF file.
-
-Response by RAGAgent
-```
-
-### 4. Memory Queries
-These test the `MemoryAgent`'s ability to retrieve past interactions from SQLite (`tmp/agent.db`).
-
-#### 4.1 Explicit Memory Query
-**Precondition**: Previous queries include "What is the capital of India" and "What is the market open price on 4th June 2025"  
-**Question**: "What did I ask earlier?"  
-**Expected Output**:
-```
-You previously asked:
-- "What is the capital of India"
-- "What is the market open price on 4th June 2025"
-
-Response by MemoryAgent
-```
-
-#### 4.2 No Memory Available
-**Precondition**: Fresh session with no prior queries  
-**Question**: "What did I ask earlier?"  
-**Expected Output**:
-```
-No relevant history found.
-
-Response by MemoryAgent
-```
-
-### 5. Edge Cases
-These test the system’s robustness for ambiguous or malformed inputs.
-
-#### 5.1 Empty Query
-**Question**: ""  
-**Expected Output**:
-```
-Please provide a valid query.
-
-Response by GeneralAgent
-```
-
-#### 5.2 Malformed Date
-**Question**: "What is the market open price on June 4th"  
-**Expected Output**:
-```
-The market open price on June 4, 2025 (assuming 2025) was 18.65.
-
-Response by KnowledgeAgent
-```
-
-#### 5.3 Ambiguous Query without Prior Context
-**Question**: "market open price" (first query in session)  
-**Expected Output**:
-```
-No recent date mentioned. Please provide a date (e.g., '4th June 2025').
-
-Response by KnowledgeAgent
-```
-
-#### 5.4 Non-Supported Query
-**Question**: "What is the weather today?"  
-**Expected Output**:
-```
-I can answer questions about stock market data, PDF content, or general knowledge. For weather updates, please use a weather service.
-
-Response by GeneralAgent
-```
-
-#### 5.5 Case Insensitivity
-**Question**: "WHAT IS THE MARKET OPEN PRICE ON 4TH JUNE 2025"  
-**Expected Output**:
-```
-The market open price on June 4, 2025 was 18.65.
-
-Response by KnowledgeAgent
-```
-
-#### 5.6 Typo in Query
-**Question**: "What is the market open price on 4th Jne 2025"  
-**Expected Output**:
-```
-The market open price on June 4, 2025 was 18.65.
-
-Response by KnowledgeAgent
-```
-**Note**: Assumes the date parser corrects "Jne" to "June".
-
-## Notes
-- **CSV Data**: The `stock_market_data.csv` is assumed to contain data for a single stock/index. If multiple stocks are included, queries should specify a symbol, and the `KnowledgeAgent` would need updating.
-- **YFinanceTools**: Outputs for non-CSV queries depend on internet connectivity and API availability.
-- **Chat History**: All interactions are stored in PostgreSQL (`stock_market_db.chat_history`) and displayed in the Streamlit UI.
-- **Performance**: CSV queries are optimized by loading the file once during `KnowledgeAgent` initialization.
-- **Context**: The `GeneralAgent` uses PostgreSQL chat history to infer context (e.g., India for president queries).
-- **Edge Cases**: The system handles invalid inputs gracefully, with clear error messages.
-
-Run these tests in the Streamlit app (`http://localhost:8501`) after starting the app with `streamlit run app/main.py` and ensuring PostgreSQL is running (`docker-compose up -d`). Verify that all responses match the expected outputs and are logged in the chat history.
+**Post-Test Actions**:
+- Review chat history in the Streamlit UI to ensure queries and responses are logged.
+- Check `mcp_server.py` console for JSON-RPC request/response logs.
+- If actual outputs differ (e.g., due to `yfinance` data or prediction variance), verify the format and agent are correct.
+- If errors occur, capture the traceback and investigate:
+  - `yfinance` failures: Check internet or rate limits.
+  - CSV issues: Verify `stock_market_data.csv` path and format.
+  - Async errors: Update `main.py` for async compatibility.
