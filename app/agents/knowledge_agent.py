@@ -32,9 +32,10 @@ class KnowledgeAgent:
                 "If no year is specified (e.g., '4th June'), use the latest matching date in the CSV and note the assumed year.",
                 "For ambiguous queries like 'market open price', use the last date mentioned in chat history.",
                 "If the date is not found in the CSV, return a message indicating no data is available.",
-                "For other stock market queries, use YFinanceTools if the CSV is insufficient.",
+                "For other stock market queries (e.g., financials, analyst recommendations), use YFinanceTools if the CSV is insufficient.",
+                "For non-stock-market queries (e.g., CEOs, capitals, presidents, news), return None to pass to another agent.",
                 "Format responses clearly, e.g., 'The market open price on [date] was [price].'",
-                "Always append '*Response by KnowledgeAgent*' to the response."
+                "Always append '*Response by KnowledgeAgent*' to the response for stock market queries."
             ],
             markdown=True,
             add_datetime_to_instructions=True
@@ -63,7 +64,7 @@ class KnowledgeAgent:
                         month = month_map.get(month.lower(), month)
                         return f"{month}/{int(day):02d}/{year}"
                     elif pattern == patterns[1]:  # 'June 4, 2025'
-                        month, day, year = match.groups()
+                        day, month, year = match.groups()
                         month = month_map.get(month.lower(), month)
                         return f"{month}/{int(day):02d}/{year}"
                     elif pattern == patterns[2]:  # '4/10/2025'
@@ -98,21 +99,27 @@ class KnowledgeAgent:
 
     def query_knowledge(self, query):
         """Process stock market queries."""
+        query_lower = query.lower()
+
+        # Return None for non-stock-market queries
+        if any(keyword in query_lower for keyword in ['ceo', 'capital', 'president', 'news']):
+            return None
+
         if self.df is None:
             return f"Error: CSV file not found at {self.csv_path}.\n\n*Response by KnowledgeAgent*"
 
         # Handle ambiguous query like 'market open price'
-        if query.lower().strip() == "market open price":
+        if query_lower.strip() == "market open price":
             date_str = self.get_last_date_from_history()
             if not date_str:
                 return "No recent date mentioned. Please provide a date (e.g., '4th June 2025').\n\n*Response by KnowledgeAgent*"
         else:
             date_str = self.parse_date(query)
-            if not date_str and 'market open price' in query.lower():
+            if not date_str and 'market open price' in query_lower:
                 return "Please provide a valid date (e.g., '4th June 2025' or '4/10/2025').\n\n*Response by KnowledgeAgent*"
 
         # Check if query is about market open price with a date
-        if 'market open price' in query.lower() and date_str:
+        if 'market open price' in query_lower and date_str:
             try:
                 result = self.df[self.df['Date'] == date_str]
                 if not result.empty:
