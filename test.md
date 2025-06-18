@@ -1,36 +1,3 @@
-# Stock Market Chatbot Test Cases
-
-This document outlines test cases to verify the Stock Market Chatbot’s functionality, focusing on stock market queries (prices, historical data, predictions) using an MCP server and client. The chatbot uses a multi-agent system (`coordinator_team.py`) with a mock MCP server (`mcp_server.py`) to handle stock market tools, due to an SDK error. Tests ensure correct agent routing, context inference, and data retrieval from `yfinance` or `stock_market_data.csv`.
-
-**Setup Instructions**:
-1. Ensure `stock_market_data.csv` is in `app/data/` with columns: `Date` (MM/DD/YYYY), `Open`, `Close`, and optionally `Symbol`.
-2. Start the MCP server:
-   ```powershell
-   cd C:\Users\manng\OneDrive\Desktop\EI\chatbot\app\agents
-   python mcp_server.py
-   ```
-3. Start PostgreSQL:
-   ```powershell
-   cd C:\Users\manng\OneDrive\Desktop\EI\chatbot
-   docker-compose up -d
-   ```
-4. Run the Streamlit app:
-   ```powershell
-   streamlit run app\main.py
-   ```
-5. Access `http://localhost:8501` and input queries via the UI.
-6. Clear chat history before tests:
-   ```powershell
-   psql -U admin -d stock_market_db -c "TRUNCATE TABLE chat_history;"
-   ```
-
-**Notes**:
-- Outputs use sample `yfinance` data (as of June 18, 2025, 11:48 AM IST) or `stock_market_data.csv`. Actual prices may vary; verify format and agent.
-- Predictions use linear regression; exact values depend on historical data.
-- Tests assume dependencies from `requirements.txt`, including `modelcontextprotocol`.
-
----
-
 ## Test Case 1: Current Stock Price
 **Purpose**: Verify `GeneralAgent` fetches the latest stock price via MCP (`fetch_stock_price`).
 **Input**: "What is the stock price of NVIDIA"
@@ -200,19 +167,3 @@ Response by GeneralAgent
 - Ensure `GeneralAgent` responds.
 
 ---
-
-**Post-Test Actions**:
-- Check chat history in Streamlit UI.
-- Review `mcp_server.py` logs for MCP requests.
-- If outputs differ, verify format and agent.
-- For errors:
-  - Check `yfinance` connectivity.
-  - Confirm CSV path (`app/data/stock_market_data.csv`).
-  - Update `main.py` for async issues:
-    ```python
-    import asyncio
-    async def process_query(query, uploaded_file):
-        team = ReasoningStockTeam()
-        return await team.process_query(query, uploaded_file)
-    st.session_state.response = asyncio.run(process_query(st.session_state.query, uploaded_file))
-    ```
