@@ -11,7 +11,6 @@ from utils.db import get_chat_history
 class KnowledgeAgent:
     def __init__(self):
         self.csv_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'stock_market_data.csv')
-        # Load CSV once during initialization
         try:
             self.df = pd.read_csv(self.csv_path)
             self.df['Date'] = pd.to_datetime(self.df['Date']).dt.strftime('%m/%d/%Y')
@@ -42,11 +41,10 @@ class KnowledgeAgent:
         )
 
     def parse_date(self, query):
-        """Extract and normalize date from query."""
         patterns = [
-            r'(\d{1,2})(?:st|nd|rd|th)?\s+(\w+)\s+(\d{4})',  # e.g., '4th June 2025'
-            r'(\w+)\s+(\d{1,2}),?\s+(\d{4})',  # e.g., 'June 4, 2025'
-            r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})'  # e.g., '4/10/2025', '04-10-2025'
+            r'(\d{1,2})(?:st|nd|rd|th)?\s+(\w+)\s+(\d{4})',
+            r'(\w+)\s+(\d{1,2}),?\s+(\d{4})',
+            r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})'
         ]
         month_map = {
             'january': '01', 'february': '02', 'march': '03', 'april': '04', 'may': '05', 'june': '06',
@@ -59,28 +57,26 @@ class KnowledgeAgent:
             match = re.search(pattern, query, re.IGNORECASE)
             if match:
                 try:
-                    if pattern == patterns[0]:  # '4th June 2025'
+                    if pattern == patterns[0]:
                         day, month, year = match.groups()
                         month = month_map.get(month.lower(), month)
                         return f"{month}/{int(day):02d}/{year}"
-                    elif pattern == patterns[1]:  # 'June 4, 2025'
+                    elif pattern == patterns[1]:
                         day, month, year = match.groups()
                         month = month_map.get(month.lower(), month)
                         return f"{month}/{int(day):02d}/{year}"
-                    elif pattern == patterns[2]:  # '4/10/2025'
+                    elif pattern == patterns[2]:
                         month, day, year = match.groups()
                         return f"{int(month):02d}/{int(day):02d}/{year}"
                 except (ValueError, KeyError):
                     continue
 
-        # Handle queries without a year (e.g., '4th June')
         no_year_pattern = r'(\d{1,2})(?:st|nd|rd|th)?\s+(\w+)(?!\s+\d{4})'
         match = re.search(no_year_pattern, query, re.IGNORECASE)
         if match:
             day, month = match.groups()
             month = month_map.get(month.lower(), month)
             if self.df is not None:
-                # Find the latest year for the given month and day
                 date_prefix = f"{month}/{int(day):02d}/"
                 matching_dates = [d for d in self.df['Date'] if d.startswith(date_prefix)]
                 if matching_dates:
@@ -89,7 +85,6 @@ class KnowledgeAgent:
         return None
 
     def get_last_date_from_history(self):
-        """Retrieve the last mentioned date from chat history."""
         chat_history = get_chat_history()
         for entry in reversed(chat_history):
             date_str = self.parse_date(entry['user_query'])
@@ -98,17 +93,11 @@ class KnowledgeAgent:
         return None
 
     def query_knowledge(self, query):
-        """Process stock market queries."""
         query_lower = query.lower()
-
-        # Return None for non-stock-market queries
         if any(keyword in query_lower for keyword in ['ceo', 'capital', 'president', 'news']):
             return None
-
         if self.df is None:
             return f"Error: CSV file not found at {self.csv_path}.\n\n*Response by KnowledgeAgent*"
-
-        # Handle ambiguous query like 'market open price'
         if query_lower.strip() == "market open price":
             date_str = self.get_last_date_from_history()
             if not date_str:
@@ -117,15 +106,12 @@ class KnowledgeAgent:
             date_str = self.parse_date(query)
             if not date_str and 'market open price' in query_lower:
                 return "Please provide a valid date (e.g., '4th June 2025' or '4/10/2025').\n\n*Response by KnowledgeAgent*"
-
-        # Check if query is about market open price with a date
         if 'market open price' in query_lower and date_str:
             try:
                 result = self.df[self.df['Date'] == date_str]
                 if not result.empty:
                     open_price = result['Open'].iloc[0]
                     formatted_date = pd.to_datetime(date_str).strftime('%B %d, %Y')
-                    # Check if the original query omitted the year
                     if not re.search(r'\d{4}', query, re.IGNORECASE):
                         return f"The market open price on {formatted_date} (assuming {formatted_date[-4:]}) was {open_price:.2f}.\n\n*Response by KnowledgeAgent*"
                     return f"The market open price on {formatted_date} was {open_price:.2f}.\n\n*Response by KnowledgeAgent*"
@@ -133,8 +119,6 @@ class KnowledgeAgent:
                     return f"No data available for {date_str} in the CSV file.\n\n*Response by KnowledgeAgent*"
             except Exception as e:
                 return f"Error processing CSV: {str(e)}.\n\n*Response by KnowledgeAgent*"
-
-        # Handle other stock market queries using YFinanceTools
         try:
             yfinance_response = self.agent.run(query).content
             return f"{yfinance_response}\n\n*Response by KnowledgeAgent*"

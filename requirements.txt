@@ -9,4 +9,9 @@ aiohttp
 yfinance
 fastmcp
 numpy
-fastmcp
+modelcontextprotocol
+requests
+jsonrpcserver
+jsonrpcclient
+yfinance
+scikit-learn
