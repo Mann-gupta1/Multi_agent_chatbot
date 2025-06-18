@@ -7,11 +7,7 @@ python-dotenv
 mcp
 aiohttp
 yfinance
-fastmcp
 numpy
 modelcontextprotocol
 requests
-jsonrpcserver
-jsonrpcclient
-yfinance
 scikit-learn

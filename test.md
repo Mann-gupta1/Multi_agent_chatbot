@@ -1,125 +1,125 @@
 # Stock Market Chatbot Test Cases
 
-This document outlines test cases to verify the functionality of the stock market chatbot, focusing on stock prices, historical data, predictions, and memory queries. The chatbot uses a JSON-RPC server (`mcp_server.py`) for stock market tools, integrated with a multi-agent system (`coordinator_team.py`, `knowledge_agent.py`, etc.). Tests are designed to ensure correct agent routing, context inference, and data retrieval from `yfinance` or `stock_market_data.csv`.
+This document outlines test cases to verify the Stock Market Chatbot’s functionality, focusing on stock market queries (prices, historical data, predictions) using an MCP server and client. The chatbot uses a multi-agent system (`coordinator_team.py`) with a mock MCP server (`mcp_server.py`) to handle stock market tools, due to an SDK error. Tests ensure correct agent routing, context inference, and data retrieval from `yfinance` or `stock_market_data.csv`.
 
 **Setup Instructions**:
-1. Ensure `stock_market_data.csv` is in `app/data/` with columns: `Date`, `Open`, `Close`, and optionally `Symbol`.
-2. Start the JSON-RPC server:
-   ```bash
+1. Ensure `stock_market_data.csv` is in `app/data/` with columns: `Date` (MM/DD/YYYY), `Open`, `Close`, and optionally `Symbol`.
+2. Start the MCP server:
+   ```powershell
    cd C:\Users\manng\OneDrive\Desktop\EI\chatbot\app\agents
    python mcp_server.py
    ```
 3. Start PostgreSQL:
-   ```bash
+   ```powershell
    cd C:\Users\manng\OneDrive\Desktop\EI\chatbot
    docker-compose up -d
    ```
 4. Run the Streamlit app:
-   ```bash
+   ```powershell
    streamlit run app\main.py
    ```
 5. Access `http://localhost:8501` and input queries via the UI.
-6. Clear chat history before starting tests to ensure clean context.
+6. Clear chat history before tests:
+   ```powershell
+   psql -U admin -d stock_market_db -c "TRUNCATE TABLE chat_history;"
+   ```
 
 **Notes**:
-- Expected outputs use sample data from `yfinance` (as of June 18, 2025) or `stock_market_data.csv`. Actual prices may vary; verify the format and agent.
-- Predictions use linear regression, so exact values depend on historical data but should follow the format.
-- All tests assume a virtual environment with dependencies from `requirements.txt`.
+- Outputs use sample `yfinance` data (as of June 18, 2025, 11:48 AM IST) or `stock_market_data.csv`. Actual prices may vary; verify format and agent.
+- Predictions use linear regression; exact values depend on historical data.
+- Tests assume dependencies from `requirements.txt`, including `modelcontextprotocol`.
 
 ---
 
 ## Test Case 1: Current Stock Price
-**Purpose**: Verify `GeneralAgent` fetches the latest stock price via JSON-RPC (`fetch_stock_price`).
+**Purpose**: Verify `GeneralAgent` fetches the latest stock price via MCP (`fetch_stock_price`).
 **Input**: "What is the stock price of NVIDIA"
 **Expected Output**:
 ```
-The latest closing price of NVDA is $135.87
+135.87
 
 Response by GeneralAgent
 ```
 **Verification**:
-- Check that the response uses the correct symbol (NVDA).
-- Confirm the price is recent (within 1 day, per `yfinance`).
-- Ensure `GeneralAgent` responds, not `KnowledgeAgent`.
+- Ensure the price is for NVDA and recent (within 1 day).
+- Confirm `GeneralAgent` responds.
 
 ---
 
-## Test Case 2: Historical Stock Price with Date
-**Purpose**: Verify `GeneralAgent` fetches a historical stock price for a specific date via JSON-RPC (`fetch_stock_price`).
+## Test Case 2: Historical Stock Price
+**Purpose**: Verify `GeneralAgent` fetches a historical price via MCP (`fetch_stock_price`).
 **Input**: "Stock price of Tesla on 6/10/2025"
 **Expected Output**:
 ```
-The closing price of TSLA on 06/10/2025 was $260.45
+260.45
 
 Response by GeneralAgent
 ```
 **Verification**:
-- Confirm the date is parsed correctly (MM/DD/YYYY).
-- Verify the price matches `yfinance` data for TSLA on June 10, 2025.
+- Confirm date parsing (06/10/2025).
+- Verify price matches `yfinance` for TSLA.
 - Ensure `GeneralAgent` responds.
 
 ---
 
 ## Test Case 3: Historical Data
-**Purpose**: Verify `GeneralAgent` fetches historical stock data via JSON-RPC (`fetch_historical_data`).
+**Purpose**: Verify `GeneralAgent` fetches historical data via MCP (`fetch_historical_data`).
 **Input**: "Historical data for Apple"
 **Expected Output**:
 ```
 06/01/2025: Open=$190.10, Close=$192.30
 06/02/2025: Open=$192.50, Close=$195.80
 ...
-06/17/2025: Open=$200.00, Close=$202.15
 
 Response by GeneralAgent
 ```
 **Verification**:
-- Check that data covers the default period (1 month).
-- Confirm dates and prices align with `yfinance` or `stock_market_data.csv` for AAPL.
+- Check 1-month data for AAPL from `yfinance` or CSV.
+- Confirm format (Date, Open, Close).
 - Ensure `GeneralAgent` responds.
 
 ---
 
 ## Test Case 4: Stock Price Prediction
-**Purpose**: Verify `GeneralAgent` predicts a future stock price via JSON-RPC (`predict_stock_price`).
+**Purpose**: Verify `GeneralAgent` predicts a price via MCP (`predict_stock_price`).
 **Input**: "Predict price of NVIDIA in 5 days"
 **Expected Output**:
 ```
-Predicted closing price for NVDA in 5 days is $140.22
+140.22
 
 Response by GeneralAgent
 ```
 **Verification**:
-- Confirm the prediction uses NVDA and 5 days.
-- Verify the response format (predicted price in USD).
-- Note: Exact price depends on linear regression; check for reasonable value based on recent NVDA trends.
+- Confirm prediction for NVDA, 5 days ahead.
+- Verify format (USD price).
+- Check reasonable value based on NVDA trends.
 
 ---
 
-## Test Case 5: Context Inference for Stock Symbol
-**Purpose**: Verify context inference infers the stock symbol from chat history.
+## Test Case 5: Context Inference
+**Purpose**: Verify stock symbol inference from chat history.
 **Input Sequence**:
 1. "What is the stock price of NVIDIA"
 2. "Predict price in 3 days"
 **Expected Output**:
 1. ```
-   The latest closing price of NVDA is $135.87
+   135.87
 
    Response by GeneralAgent
    ```
 2. ```
-   Predicted closing price for NVDA in 3 days is $138.50
+   138.50
 
    Response by GeneralAgent
    ```
 **Verification**:
-- Confirm the second query infers NVDA from the first.
-- Check that both responses use `GeneralAgent`.
-- Verify price and prediction formats.
+- Confirm second query infers NVDA.
+- Ensure `GeneralAgent` responds for both.
 
 ---
 
 ## Test Case 6: CSV-Based Market Open Price
-**Purpose**: Verify `KnowledgeAgent` retrieves market open price from `stock_market_data.csv`.
+**Purpose**: Verify `KnowledgeAgent` retrieves open price from `stock_market_data.csv`.
 **Input**: "What is the market open price on 4th June"
 **Expected Output**:
 ```
@@ -128,8 +128,7 @@ The market open price on June 4, 2025 (assuming 2025) was 18.65.
 Response by KnowledgeAgent
 ```
 **Verification**:
-- Confirm the date is parsed as June 4, 2025.
-- Verify the open price matches `stock_market_data.csv`.
+- Confirm price matches CSV for June 4, 2025.
 - Ensure `KnowledgeAgent` responds.
 
 ---
@@ -141,7 +140,7 @@ Response by KnowledgeAgent
 2. "What did I ask earlier?"
 **Expected Output**:
 1. ```
-   The latest closing price of NVDA is $135.87
+   135.87
 
    Response by GeneralAgent
    ```
@@ -152,28 +151,28 @@ Response by KnowledgeAgent
    Response by MemoryAgent
    ```
 **Verification**:
-- Confirm the second query lists the first query.
+- Confirm second query lists first query.
 - Ensure `MemoryAgent` responds.
 
 ---
 
 ## Test Case 8: Invalid Stock Symbol
-**Purpose**: Verify error handling for invalid stock symbols.
+**Purpose**: Verify error handling for invalid symbols.
 **Input**: "What is the stock price of XYZ"
 **Expected Output**:
 ```
-Error fetching price for XYZ: No data for XYZ
+No data for XYZ
 
 Response by GeneralAgent
 ```
 **Verification**:
-- Confirm the error message is clear.
+- Confirm error message.
 - Ensure `GeneralAgent` responds.
 
 ---
 
 ## Test Case 9: Non-Stock-Market Query
-**Purpose**: Verify fallback to Groq API for non-stock-market queries.
+**Purpose**: Verify Groq API fallback for non-stock queries.
 **Input**: "Who is the CEO of NVIDIA"
 **Expected Output**:
 ```
@@ -182,15 +181,14 @@ The CEO of NVIDIA is Jensen Huang.
 Response by GeneralAgent
 ```
 **Verification**:
-- Confirm the response uses the Groq API (not JSON-RPC).
+- Confirm Groq API response.
 - Ensure `GeneralAgent` responds.
-- Note: This tests the fallback mechanism, as CEO queries are outside the stock market focus.
 
 ---
 
-## Test Case 10: Ambiguous Query Without Context
-**Purpose**: Verify handling of ambiguous queries without chat history context.
-**Input**: "Stock price" (with no prior queries)
+## Test Case 10: Ambiguous Query
+**Purpose**: Verify handling of ambiguous queries without context.
+**Input**: "Stock price" (no prior queries)
 **Expected Output**:
 ```
 Please specify a stock symbol (e.g., NVDA, TSLA).
@@ -198,16 +196,23 @@ Please specify a stock symbol (e.g., NVDA, TSLA).
 Response by GeneralAgent
 ```
 **Verification**:
-- Confirm the response prompts for a symbol.
+- Confirm prompt for symbol.
 - Ensure `GeneralAgent` responds.
 
 ---
 
 **Post-Test Actions**:
-- Review chat history in the Streamlit UI to ensure queries and responses are logged.
-- Check `mcp_server.py` console for JSON-RPC request/response logs.
-- If actual outputs differ (e.g., due to `yfinance` data or prediction variance), verify the format and agent are correct.
-- If errors occur, capture the traceback and investigate:
-  - `yfinance` failures: Check internet or rate limits.
-  - CSV issues: Verify `stock_market_data.csv` path and format.
-  - Async errors: Update `main.py` for async compatibility.
+- Check chat history in Streamlit UI.
+- Review `mcp_server.py` logs for MCP requests.
+- If outputs differ, verify format and agent.
+- For errors:
+  - Check `yfinance` connectivity.
+  - Confirm CSV path (`app/data/stock_market_data.csv`).
+  - Update `main.py` for async issues:
+    ```python
+    import asyncio
+    async def process_query(query, uploaded_file):
+        team = ReasoningStockTeam()
+        return await team.process_query(query, uploaded_file)
+    st.session_state.response = asyncio.run(process_query(st.session_state.query, uploaded_file))
+    ```
